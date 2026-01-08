@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>EDN - Worklog Timer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+  <style>
+    :root {
+      --primary: #0052CC;
+      --primary-dark: #0747A6;
+      --bg: #0f172a;
+      --card: rgba(255, 255, 255, 0.08);
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --success: #22c55e;
+      --danger: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box;
+      font-family: "Segoe UI", system-ui, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #020617, #0f172a);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text);
+    }
+
+    .card {
+      width: 100%;
+      max-width: 420px;
+      background: var(--card);
+      backdrop-filter: blur(18px);
+      border-radius: 20px;
+      padding: 28px;
+      box-shadow: 0 30px 60px rgba(0,0,0,.5);
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 1.6rem;
+      text-align: center;
+    }
+
+    p.subtitle {
+      margin: 0 0 24px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    label {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    input, textarea {
+      width: 100%;
+      margin-top: 6px;
+      margin-bottom: 18px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: none;
+      outline: none;
+      background: rgba(255,255,255,0.12);
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+
+    textarea {
+      resize: none;
+      height: 70px;
+    }
+
+    .timer {
+      text-align: center;
+      font-size: 2.4rem;
+      font-weight: bold;
+      margin: 12px 0 22px;
+      letter-spacing: 1px;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 12px;
+    }
+
+    button {
+      flex: 1;
+      padding: 14px;
+      border-radius: 14px;
+      border: none;
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: white;
+      transition: all 0.2s ease;
+    }
+
+    button.start {
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+    }
+
+    button.stop {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .status {
+      margin-top: 18px;
+      font-size: 0.85rem;
+      text-align: center;
+    }
+
+    .status.success { color: var(--success); }
+    .status.error { color: var(--danger); }
+
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h1>EDN - Worklog Timer</h1>
+    <p class="subtitle">Cronômetro integrado ao Jira</p>
+
+    <label>Issue</label>
+    <input id="issue" placeholder="EDN-123"/>
+
+    <div class="timer" id="timer">00:00:00</div>
+
+    <div class="buttons">
+      <button class="start" id="startBtn" onclick="startTimer()">▶ Start</button>
+      <button class="stop" id="stopBtn" onclick="stopTimer()" disabled>■ Stop</button>
+    </div>
+
+    <label>Comentário (opcional)</label>
+    <textarea id="comment" placeholder="O que foi feito?"></textarea>
+
+    <div id="status" class="status"></div>
+  </div>
+
+<script>
+let startTime = null;
+let interval = null;
+
+function formatTime(seconds) {
+  const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
+  const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
+  const s = String(seconds % 60).padStart(2, '0');
+  return `${h}:${m}:${s}`;
+}
+
+function startTimer() {
+  const issue = document.getElementById("issue").value;
+  if (!issue) {
+    setStatus("Informe a Issue.", true);
+    return;
+  }
+
+  fetch("/start", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ issue })
+  });
+
+  startTime = Date.now();
+  interval = setInterval(() => {
+    const seconds = Math.floor((Date.now() - startTime) / 1000);
+    document.getElementById("timer").innerText = formatTime(seconds);
+  }, 1000);
+
+  document.getElementById("startBtn").disabled = true;
+  document.getElementById("stopBtn").disabled = false;
+  setStatus("Cronômetro iniciado");
+}
+
+function stopTimer() {
+  clearInterval(interval);
+
+  fetch("/stop", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      comment: document.getElementById("comment").value
+    })
+  })
+  .then(r => r.json())
+  .then(d => {
+    setStatus(`Worklog registrado (${d.seconds}s)`, false, true);
+  })
+  .catch(() => {
+    setStatus("Erro ao registrar worklog", true);
+  });
+
+  document.getElementById("startBtn").disabled = false;
+  document.getElementById("stopBtn").disabled = true;
+}
+
+function setStatus(msg, isError=false, success=false) {
+  const el = document.getElementById("status");
+  el.innerText = msg;
+  el.className = "status " + (isError ? "error" : success ? "success" : "");
+}
+</script>
+
+</body>
+</html>
