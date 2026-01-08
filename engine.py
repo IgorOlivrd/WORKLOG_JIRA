@@ -5,8 +5,8 @@ import time
 from datetime import datetime, timezone, timedelta
 
 JIRA_BASE_URL = "https://credisis.atlassian.net"
-JIRA_EMAIL = "igor.oliveira@credisis.com.br"
-JIRA_API_TOKEN = "ATATT3xFfGF06H7x6YDPRS-Mw9Ss7T46m1k1SWckUhVCorxrtR4PKDWk9Z2WJeeqF7t4rNR6hyuT69CFy0IFE87NbTmi5gKo5onINy-IL2usr72ImNysL1jgmY_rcx4xJPypWKB_OwfU6rE2NxUfRtUs_yYadS2NT9kyCFIjGyQBZ0Kicr6413k=9FC1F0BC"
+JIRA_EMAIL = "email@credisis.com.br" #Alterar aqui para seu e-mail
+JIRA_API_TOKEN = "SEU_TOKEN_AQUI" #Alterar aqui para seu token
 
 TZ = timezone(timedelta(hours=-3))
 
@@ -39,4 +39,5 @@ def log_work(issue, started_dt, seconds, comment):
     }
 
     response = requests.post(url, auth=auth, json=payload)
+
     return response.status_code, response.text
