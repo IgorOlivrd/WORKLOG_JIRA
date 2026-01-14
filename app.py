@@ -1,13 +1,19 @@
 from flask import Flask, render_template, request, jsonify
-from engine import start_timer, stop_timer, log_work
+from engine import start_timer, stop_timer, log_work, validate_issue
 
 app = Flask(__name__)
 
-STATE = {}  # memória simples (1 usuário)
+STATE = {}  # memória simples para armazenar o estado atual
 
 @app.route("/")
 def index():
     return render_template("index.html")
+
+# endpoint de validação de issue
+@app.route("/validate-issue", methods=["POST"])
+def validate():
+    issue = request.json.get("issue", "").strip().upper()
+    return jsonify(validate_issue(issue))
 
 @app.route("/start", methods=["POST"])
 def start():

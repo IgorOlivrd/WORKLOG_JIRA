@@ -8,7 +8,6 @@
   <style>
     :root {
       --primary: #0052CC;
-      --primary-dark: #0747A6;
       --bg: #0f172a;
       --card: rgba(255, 255, 255, 0.08);
       --text: #e5e7eb;
@@ -63,7 +62,7 @@
     input, textarea {
       width: 100%;
       margin-top: 6px;
-      margin-bottom: 18px;
+      margin-bottom: 8px;
       padding: 12px 14px;
       border-radius: 12px;
       border: none;
@@ -76,6 +75,7 @@
     textarea {
       resize: none;
       height: 70px;
+      margin-bottom: 18px;
     }
 
     .timer {
@@ -117,16 +117,16 @@
     }
 
     .status {
-      margin-top: 18px;
+      margin-top: 6px;
       font-size: 0.85rem;
       text-align: center;
     }
 
     .status.success { color: var(--success); }
     .status.error { color: var(--danger); }
-
   </style>
 </head>
+
 <body>
 
   <div class="card">
@@ -134,12 +134,13 @@
     <p class="subtitle">Cronômetro integrado ao Jira</p>
 
     <label>Issue</label>
-    <input id="issue" placeholder="EDN-123"/>
+    <input id="issue" placeholder="EDN-123" oninput="debouncedValidate()" />
+    <div id="issueStatus" class="status"></div>
 
     <div class="timer" id="timer">00:00:00</div>
 
     <div class="buttons">
-      <button class="start" id="startBtn" onclick="startTimer()">▶ Start</button>
+      <button class="start" id="startBtn" onclick="startTimer()" disabled>▶ Start</button>
       <button class="stop" id="stopBtn" onclick="stopTimer()" disabled>■ Stop</button>
     </div>
 
@@ -152,6 +153,8 @@
 <script>
 let startTime = null;
 let interval = null;
+let debounceTimer = null;
+let issueValid = false;
 
 function formatTime(seconds) {
   const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
@@ -160,12 +163,49 @@ function formatTime(seconds) {
   return `${h}:${m}:${s}`;
 }
 
+function debouncedValidate() {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(validateIssue, 600);
+}
+
+function validateIssue() {
+  const issue = document.getElementById("issue").value.trim().toUpperCase();
+  if (!issue) return;
+
+  fetch("/validate-issue", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ issue })
+  })
+  .then(r => r.json())
+  .then(d => {
+    const el = document.getElementById("issueStatus");
+    if (d.valid) {
+      issueValid = true;
+      el.innerText = `✔️ ${d.key} — ${d.summary} (${d.status})`;
+      el.className = "status success";
+      document.getElementById("startBtn").disabled = false;
+    } else {
+      issueValid = false;
+      el.innerText = `❌ ${d.error}`;
+      el.className = "status error";
+      document.getElementById("startBtn").disabled = true;
+    }
+  })
+  .catch(() => {
+    issueValid = false;
+    document.getElementById("issueStatus").innerText = "❌ Erro ao validar issue";
+    document.getElementById("issueStatus").className = "status error";
+  });
+}
+
 function startTimer() {
-  const issue = document.getElementById("issue").value;
-  if (!issue) {
-    setStatus("Informe a Issue.", true);
+  if (!issueValid) {
+    setStatus("Issue inválida.", true);
     return;
   }
+
+  const issue = document.getElementById("issue").value;
 
   fetch("/start", {
     method: "POST",
