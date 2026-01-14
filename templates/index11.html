@@ -31,77 +31,6 @@
       color: var(--text);
     }
 
-    /* ===== WELCOME OVERLAY ===== */
-    #welcome {
-      position: fixed;
-      inset: 0;
-      background: linear-gradient(135deg, #020617, #0f172a);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 999;
-      animation: fadeOut 1s ease forwards;
-      animation-delay: 2.8s;
-    }
-
-    .welcome-card {
-      text-align: center;
-      animation: scaleIn 0.8s ease forwards;
-    }
-
-    .welcome-title {
-      font-size: 2.4rem;
-      margin-bottom: 6px;
-      opacity: 0;
-      animation: fadeUp 0.8s ease forwards;
-    }
-
-    .welcome-user {
-      font-size: 1.1rem;
-      color: var(--muted);
-      margin-bottom: 22px;
-      opacity: 0;
-      animation: fadeUp 0.8s ease forwards;
-      animation-delay: 0.4s;
-    }
-
-    .loader {
-      width: 52px;
-      height: 52px;
-      border-radius: 50%;
-      border: 4px solid rgba(255,255,255,0.2);
-      border-top-color: var(--primary);
-      margin: 0 auto 16px;
-      animation: spin 1s linear infinite;
-    }
-
-    .welcome-sub {
-      font-size: 0.85rem;
-      color: var(--muted);
-      opacity: 0;
-      animation: fadeUp 0.8s ease forwards;
-      animation-delay: 0.8s;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(12px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    @keyframes scaleIn {
-      from { transform: scale(0.96); }
-      to { transform: scale(1); }
-    }
-
-    @keyframes fadeOut {
-      to { opacity: 0; pointer-events: none; }
-    }
-
-    /* ===== APP CARD ===== */
     .card {
       width: 100%;
       max-width: 420px;
@@ -110,14 +39,6 @@
       border-radius: 20px;
       padding: 28px;
       box-shadow: 0 30px 60px rgba(0,0,0,.5);
-      opacity: 0;
-      transform: translateY(20px);
-    }
-
-    .card.show {
-      opacity: 1;
-      transform: translateY(0);
-      transition: all 0.6s ease;
     }
 
     h1 {
@@ -179,6 +100,7 @@
       font-size: 0.95rem;
       font-weight: 600;
       color: white;
+      transition: all 0.2s ease;
     }
 
     button.start {
@@ -207,52 +129,34 @@
 
 <body>
 
-<!-- WELCOME -->
-<div id="welcome">
-  <div class="welcome-card">
-    <div class="welcome-title">Bem-vindo</div>
-    <div class="welcome-user">{{ user_name }}</div>
-    <div class="loader"></div>
-    <div class="welcome-sub">Conectando ao Jira...</div>
+  <div class="card">
+    <h1>EDN - Worklog Timer</h1>
+    <p class="subtitle">
+      Logado como {{ user_name }} {{ user_email }}
+    </p>
+
+    <label>Issue</label>
+    <input id="issue" placeholder="EDN-123" oninput="debouncedValidate()" />
+    <div id="issueStatus" class="status"></div>
+
+    <div class="timer" id="timer">00:00:00</div>
+
+    <div class="buttons">
+      <button class="start" id="startBtn" onclick="startTimer()" disabled>▶ Start</button>
+      <button class="stop" id="stopBtn" onclick="stopTimer()" disabled>■ Stop</button>
+    </div>
+
+    <label>Comentário (opcional)</label>
+    <textarea id="comment" placeholder="O que foi feito?"></textarea>
+
+    <div id="status" class="status"></div>
   </div>
-</div>
-
-<!-- APP -->
-<div class="card" id="app">
-  <h1>EDN - Worklog Timer</h1>
-  <p class="subtitle">
-    Logado como {{ user_name }} {{ user_email }}
-  </p>
-
-  <label>Issue</label>
-  <input id="issue" placeholder="EDN-123" oninput="debouncedValidate()" />
-  <div id="issueStatus" class="status"></div>
-
-  <div class="timer" id="timer">00:00:00</div>
-
-  <div class="buttons">
-    <button class="start" id="startBtn" onclick="startTimer()" disabled>▶ Start</button>
-    <button class="stop" id="stopBtn" onclick="stopTimer()" disabled>■ Stop</button>
-  </div>
-
-  <label>Comentário (opcional)</label>
-  <textarea id="comment" placeholder="O que foi feito?"></textarea>
-
-  <div id="status" class="status"></div>
-</div>
 
 <script>
 let startTime = null;
 let interval = null;
 let debounceTimer = null;
 let issueValid = false;
-
-window.onload = () => {
-  setTimeout(() => {
-    document.getElementById("welcome").remove();
-    document.getElementById("app").classList.add("show");
-  }, 2800);
-};
 
 function formatTime(seconds) {
   const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
@@ -289,23 +193,37 @@ function validateIssue() {
       el.className = "status error";
       document.getElementById("startBtn").disabled = true;
     }
+  })
+  .catch(() => {
+    issueValid = false;
+    document.getElementById("issueStatus").innerText = "❌ Erro ao validar issue";
+    document.getElementById("issueStatus").className = "status error";
   });
 }
 
 function startTimer() {
+  if (!issueValid) {
+    setStatus("Issue inválida.", true);
+    return;
+  }
+
   fetch("/start", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({ issue: issue.value })
+    body: JSON.stringify({
+      issue: document.getElementById("issue").value
+    })
   });
 
   startTime = Date.now();
   interval = setInterval(() => {
-    timer.innerText = formatTime(Math.floor((Date.now() - startTime) / 1000));
+    const seconds = Math.floor((Date.now() - startTime) / 1000);
+    document.getElementById("timer").innerText = formatTime(seconds);
   }, 1000);
 
-  startBtn.disabled = true;
-  stopBtn.disabled = false;
+  document.getElementById("startBtn").disabled = true;
+  document.getElementById("stopBtn").disabled = false;
+  setStatus("Cronômetro iniciado");
 }
 
 function stopTimer() {
@@ -314,16 +232,26 @@ function stopTimer() {
   fetch("/stop", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({ comment: comment.value })
+    body: JSON.stringify({
+      comment: document.getElementById("comment").value
+    })
   })
   .then(r => r.json())
   .then(d => {
-    status.innerText = `Worklog registrado (${d.seconds}s)`;
-    status.className = "status success";
+    setStatus(`Worklog registrado (${d.seconds}s)`, false, true);
+  })
+  .catch(() => {
+    setStatus("Erro ao registrar worklog", true);
   });
 
-  startBtn.disabled = false;
-  stopBtn.disabled = true;
+  document.getElementById("startBtn").disabled = false;
+  document.getElementById("stopBtn").disabled = true;
+}
+
+function setStatus(msg, isError=false, success=false) {
+  const el = document.getElementById("status");
+  el.innerText = msg;
+  el.className = "status " + (isError ? "error" : success ? "success" : "");
 }
 </script>
 

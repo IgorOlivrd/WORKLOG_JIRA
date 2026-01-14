@@ -1,47 +1,50 @@
-from flask import Flask, render_template, request, jsonify
-from engine import start_timer, stop_timer, log_work, validate_issue
+from flask import Flask, render_template, jsonify, request
+from engine import (
+    start_timer,
+    stop_timer,
+    validate_issue,
+    log_work,
+    validate_jira_login, get_current_user
+)
+from config import has_credentials, JIRA_EMAIL
 
 app = Flask(__name__)
-
-STATE = {}  # memória simples para armazenar o estado atual
+STATE = {}
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    if not has_credentials():
+        return "❌ Arquivo .env não configurado", 500
 
-# endpoint de validação de issue
+    if not validate_jira_login():
+        return "❌ Token Jira inválido", 401
+
+    return render_template("index.html", user_email=JIRA_EMAIL)
+
 @app.route("/validate-issue", methods=["POST"])
 def validate():
-    issue = request.json.get("issue", "").strip().upper()
-    return jsonify(validate_issue(issue))
+    return jsonify(validate_issue(request.json["issue"]))
 
 @app.route("/start", methods=["POST"])
 def start():
-    issue = request.json["issue"]
     started_dt, start_ts = start_timer()
-
-    STATE["issue"] = issue
-    STATE["started_dt"] = started_dt
-    STATE["start_ts"] = start_ts
-
+    STATE.update({
+        "issue": request.json["issue"],
+        "started_dt": started_dt,
+        "start_ts": start_ts
+    })
     return jsonify({"status": "started"})
 
 @app.route("/stop", methods=["POST"])
 def stop():
     seconds = stop_timer(STATE["start_ts"])
-    comment = request.json.get("comment", "")
-
-    status, response = log_work(
+    status = log_work(
         STATE["issue"],
         STATE["started_dt"],
         seconds,
-        comment
+        request.json.get("comment")
     )
-
-    return jsonify({
-        "seconds": seconds,
-        "jira_status": status
-    })
+    return jsonify({"seconds": seconds, "jira_status": status})
 
 if __name__ == "__main__":
     app.run(debug=True)

@@ -1,22 +1,48 @@
-# engine.py
 import requests
 from requests.auth import HTTPBasicAuth
 import time
 from datetime import datetime, timezone, timedelta
-
-JIRA_BASE_URL = "https://credisis.atlassian.net"
-JIRA_EMAIL = "seu_email@credisis.com.br"
-JIRA_API_TOKEN = "SEU_TOKEN_AQUI"
+from config import JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN
 
 TZ = timezone(timedelta(hours=-3))
 
+def validate_jira_login():
+    r = requests.get(
+        f"{JIRA_BASE_URL}/rest/api/3/myself",
+        auth=HTTPBasicAuth(JIRA_EMAIL, JIRA_API_TOKEN)
+    )
+    return r.status_code == 200
+
 def start_timer():
-    started_dt = datetime.now(TZ)
-    start_ts = time.time()
-    return started_dt, start_ts
+    return datetime.now(TZ), time.time()
 
 def stop_timer(start_ts):
     return max(1, int(time.time() - start_ts))
+
+def validate_issue(issue):
+    r = requests.get(
+        f"{JIRA_BASE_URL}/rest/api/3/issue/{issue}",
+        auth=HTTPBasicAuth(JIRA_EMAIL, JIRA_API_TOKEN)
+    )
+
+
+    if r.status_code == 200:
+        d = r.json()
+        return {
+            "valid": True,
+            "key": d["key"],
+            "summary": d["fields"]["summary"],
+            "status": d["fields"]["status"]["name"]
+        }
+
+    return {"valid": False, "error": "Issue inválida ou sem permissão"}
+
+def get_current_user():
+    r = requests.get(
+        f"{JIRA_BASE_URL}/rest/api/3/myself",
+        auth=HTTPBasicAuth(JIRA_EMAIL, JIRA_API_TOKEN)
+    )
+    return r.json()
 
 def log_work(issue, started_dt, seconds, comment):
     url = f"{JIRA_BASE_URL}/rest/api/3/issue/{issue}/worklog"
@@ -40,30 +66,3 @@ def log_work(issue, started_dt, seconds, comment):
 
     response = requests.post(url, auth=auth, json=payload)
     return response.status_code, response.text
-
-
-# validação da issue
-def validate_issue(issue):
-    url = f"{JIRA_BASE_URL}/rest/api/3/issue/{issue}"
-    auth = HTTPBasicAuth(JIRA_EMAIL, JIRA_API_TOKEN)
-
-    response = requests.get(
-        url,
-        auth=auth,
-        headers={"Accept": "application/json"}
-    )
-
-    if response.status_code == 200:
-        data = response.json()
-        return {
-            "valid": True,
-            "key": data["key"],
-            "summary": data["fields"]["summary"],
-            "status": data["fields"]["status"]["name"],
-            "type": data["fields"]["issuetype"]["name"]
-        }
-
-    return {
-        "valid": False,
-        "error": "Issue não encontrada ou sem permissão"
-    }
